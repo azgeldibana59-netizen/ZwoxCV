@@ -16,7 +16,10 @@
 :root{color-scheme:dark;--bg:#04040a;--fg:#e8e8f5;--mut:#8a8aa8;--ac:#ff8a2b;--ac2:#7c5cff;--card:rgba(255,255,255,.04);--bd:rgba(255,255,255,.09);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box;margin:0}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:hidden}
+body{background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+html.perf #cur,html.perf #curdot{display:none}
+html.perf body,html.perf a,html.perf button,html.perf .card,html.perf input,html.perf textarea{cursor:auto}
+html.perf nav,html.perf .util{backdrop-filter:none;background:rgba(4,4,10,.85)}
 #bg{position:fixed;inset:0;z-index:0;pointer-events:none}
 #glow{position:fixed;width:420px;height:420px;border-radius:50%;pointer-events:none;z-index:1;background:radial-gradient(circle,rgba(124,92,255,.18),transparent 65%);transform:translate(-50%,-50%);left:50%;top:50%}
 main{position:relative;z-index:2}
@@ -46,7 +49,7 @@ h2 span{color:var(--ac)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.2rem}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:2rem 1.6rem;position:relative;overflow:hidden;transition:transform .15s,border-color .3s;transform-style:preserve-3d}
 .card::before{content:"";position:absolute;inset:0;background:radial-gradient(260px circle at var(--mx,50%) var(--my,50%),rgba(255,138,43,.18),transparent 60%);opacity:0;transition:opacity .3s}
-.card:hover{border-color:rgba(255,138,43,.5)}.card:hover::before{opacity:1}
+.card:hover{border-color:rgba(255,138,43,.5);box-shadow:0 14px 34px -14px rgba(255,138,43,.25)}.card:hover::before{opacity:1}
 .card .icn{font-size:1.6rem;margin-bottom:1rem;filter:grayscale(.2)}
 .card b{display:block;font-size:.75rem;color:var(--ac2);letter-spacing:.3em;margin-bottom:.8rem}
 .card h3{font-weight:500;font-size:1.2rem}
@@ -139,6 +142,7 @@ footer{text-align:center;color:var(--mut);padding:3rem;font-size:.8rem;letter-sp
 <button id="langBtn" title="TR/EN">TR</button>
 <button id="themeBtn" title="Tema">🌙</button>
 <button id="sndBtn" title="Ses">🔊</button>
+<button id="perfBtn" title="Performans Modu">⚡</button>
 </div>
 <div class="swatches" id="swatches" style="position:fixed;top:calc(3.6rem + env(safe-area-inset-top,0px));right:1.2rem;z-index:52"></div>
 <nav id="nav">
@@ -372,7 +376,7 @@ document.querySelectorAll(".cpy").forEach(b=>b.addEventListener("click",async e=
 // ---- click burst particles ----
 addEventListener("pointerdown",e=>{
  if(e.target.closest("input,textarea,.cform")) return;
- for(let i=0;i<7;i++){
+ for(let i=0;i<(PERF?3:7);i++){
   const d=document.createElement("div");d.className="burst";
   d.style.left=e.clientX+"px";d.style.top=e.clientY+"px";
   document.body.appendChild(d);
@@ -414,18 +418,33 @@ const M={x:innerWidth/2,y:innerHeight/2,sx:innerWidth/2,sy:innerHeight/2};
 const glow=document.getElementById("glow");
 addEventListener("pointermove",e=>{M.x=e.clientX;M.y=e.clientY});
 
+// ---- performance mode: auto-detect low-power devices, plus a manual override ----
+let PERF=false;
+try{PERF=localStorage.getItem("zc_perf")==="1"}catch(e){}
+const autoLow=innerWidth<768||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4)||matchMedia("(prefers-reduced-motion: reduce)").matches;
+if(!PERF)PERF=autoLow;
+function dpr(){return PERF?1:Math.min(devicePixelRatio||1,2)}
+const perfBtn=document.getElementById("perfBtn");
+function setPerfUI(){perfBtn.classList.toggle("cur",PERF);perfBtn.style.color=PERF?"var(--ac)":"";document.documentElement.classList.toggle("perf",PERF)}
+perfBtn.addEventListener("click",()=>{PERF=!PERF;try{localStorage.setItem("zc_perf",PERF?"1":"0")}catch(e){}setPerfUI();rs();rb();beep(500,.03)});
+setPerfUI();
 
 // background particles reacting to mouse
 const bg=document.getElementById("bg"),bx=bg.getContext("2d");
 let W,H,P=[];
-function rs(){const d=Math.min(devicePixelRatio||1,2);W=bg.width=innerWidth*d;H=bg.height=innerHeight*d;bx.setTransform(d,0,0,d,0,0);W=innerWidth;H=innerHeight;
- P=Array.from({length:Math.min(140,Math.floor(W*H/9000))},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,r:Math.random()*1.4+.4}))}
+function rs(){const d=dpr();W=bg.width=innerWidth*d;H=bg.height=innerHeight*d;bx.setTransform(d,0,0,d,0,0);W=innerWidth;H=innerHeight;
+ const cap=PERF?45:140;
+ P=Array.from({length:Math.min(cap,Math.floor(W*H/9000))},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,r:Math.random()*1.4+.4}))}
 addEventListener("resize",rs);rs();
 
 // black hole
 const bh=document.getElementById("bh"),c=bh.getContext("2d");
-let bw,bhh;function rb(){const d=Math.min(devicePixelRatio||1,2);bh.width=innerWidth*d;bh.height=innerHeight*d;c.setTransform(d,0,0,d,0,0);bw=innerWidth;bhh=innerHeight}
+let bw,bhh;function rb(){const d=dpr();bh.width=innerWidth*d;bh.height=innerHeight*d;c.setTransform(d,0,0,d,0,0);bw=innerWidth;bhh=innerHeight}
 addEventListener("resize",rb);rb();
+
+// pause rendering entirely when the tab isn't visible, to save battery/CPU
+let RUNNING=true;
+document.addEventListener("visibilitychange",()=>{RUNNING=!document.hidden;if(RUNNING)requestAnimationFrame(frame)});
 const hero=document.getElementById("hero"),stick=document.querySelector(".stick"),navEl=document.getElementById("nav"),progEl=document.getElementById("prog"),hintEl=document.getElementById("hint"),totopEl=document.getElementById("totop");
 totopEl.addEventListener("click",()=>{scrollTo({top:0,behavior:"smooth"});beep(560,.03)});
 let prog=0,tp=0,pinDist=1;
@@ -448,8 +467,8 @@ addEventListener("scroll",upd,{passive:true});
 addEventListener("resize",measure);
 measure();upd();
 document.querySelectorAll('nav a').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();document.querySelector(a.getAttribute('href')).scrollIntoView({behavior:'smooth'})}));
-const D=Array.from({length:2000},()=>{const k=Math.random();return{r:1.3+Math.pow(k,1.7)*2.3,a:Math.random()*6.283,s:.3+Math.random()*.45,z:Math.random()*1.7+.4,h:12+k*34+(Math.random()*16)}});
-const STARS=Array.from({length:220},()=>({x:Math.random(),y:Math.random(),r:Math.random()*1.3+.2,tw:Math.random()*6.283,sp:.5+Math.random()*1.5}));
+const D=Array.from({length:PERF?700:2000},()=>{const k=Math.random();return{r:1.3+Math.pow(k,1.7)*2.3,a:Math.random()*6.283,s:.3+Math.random()*.45,z:Math.random()*1.7+.4,h:12+k*34+(Math.random()*16)}});
+const STARS=Array.from({length:PERF?80:220},()=>({x:Math.random(),y:Math.random(),r:Math.random()*1.3+.2,tw:Math.random()*6.283,sp:.5+Math.random()*1.5}));
 let T=0;
 function frame(){
  T+=.016;prog+=(tp-prog)*.08;
@@ -525,7 +544,7 @@ function frame(){
  c.beginPath();c.arc(cx,cy,R*1.01,0,6.283);c.stroke();c.shadowBlur=0;
 
  draw(true);
- requestAnimationFrame(frame)}
+ if(RUNNING)requestAnimationFrame(frame)}
 frame();
 </script>
 </body>
